@@ -2,6 +2,7 @@ import {
   type AttributeNode,
   baseParse,
   type DirectiveNode,
+  ElementTypes,
   type ElementNode,
   NodeTypes,
   type RootNode,
@@ -25,6 +26,10 @@ const VOID_TAGS = new Set([
   "track",
   "wbr",
 ]);
+
+const FORM_CONTROL_TAGS = new Set(["input", "select", "textarea"]);
+const INTERACTIVE_TAGS = new Set(["button", "input", "select", "textarea", "summary"]);
+const INLINE_PROP_SKIP_ARGS = new Set(["class", "style"]);
 
 const isDirective = (prop: ElementNode["props"][number]): prop is DirectiveNode =>
   prop.type === NodeTypes.DIRECTIVE;
@@ -73,12 +78,24 @@ const makeDiagnostic = (
 });
 
 const parseIndexAlias = (expression: string): string | null => {
-  const match = expression.match(/^\s*\(?\s*[^,\s)]+(?:\s*,\s*[^,\s)]+)?(?:\s*,\s*([^,\s)]+))?\s*\)?\s+(?:in|of)\s+/);
-  return match?.[1] ?? null;
+  const aliasMatch = expression.match(/^\s*(.*?)\s+(?:in|of)\s+/);
+  const aliasSource = aliasMatch?.[1]?.trim().replace(/^\(|\)$/g, "") ?? "";
+  const aliases = aliasSource
+    .split(",")
+    .map((alias) => alias.trim())
+    .filter(Boolean);
+  if (aliases.length === 2) return aliases[1]!;
+  if (aliases.length >= 3) return aliases[2]!;
+  return null;
 };
 
 const normalizeExpression = (expression: string): string =>
   expression.trim().replace(/^['"`]|['"`]$/g, "");
+
+const normalizeStaticId = (value: string | null): string | null => {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+};
 
 const stripStringLiterals = (expression: string): string =>
   expression
@@ -96,21 +113,82 @@ const containsExpensiveWork = (expression: string): boolean =>
     expression,
   );
 
+const containsHydrationUnstableWork = (expression: string): boolean =>
+  /\b(?:Math\.random|Date\.now|crypto\.randomUUID)\s*\(|\bnew\s+Date\s*\(/.test(expression);
+
 const shouldCheckDirectiveExpressionPurity = (directive: DirectiveNode): boolean =>
   directive.name !== "on" &&
   directive.name !== "model" &&
   !(directive.name === "bind" && directive.arg?.loc.source === "ref");
 
+const getAccessibleText = (children: TemplateChildNode[]): string =>
+  children
+    .map((child) => {
+      if (child.type === NodeTypes.TEXT || child.type === NodeTypes.INTERPOLATION) {
+        return child.loc.source;
+      }
+      if (child.type === NodeTypes.ELEMENT) {
+        return getAccessibleText(child.children);
+      }
+      return "";
+    })
+    .join("");
+
 const hasAccessibleName = (node: ElementNode): boolean => {
   if (getAttribute(node, "aria-label") || getDirective(node, "bind", "aria-label")) return true;
+  if (getAttribute(node, "aria-labelledby") || getDirective(node, "bind", "aria-labelledby")) return true;
   if (getAttribute(node, "title") || getDirective(node, "bind", "title")) return true;
 
-  const text = node.children
-    .filter((child) => child.type === NodeTypes.TEXT || child.type === NodeTypes.INTERPOLATION)
-    .map((child) => child.loc.source)
-    .join("")
-    .trim();
+  const text = getAccessibleText(node.children).trim();
   return text.length > 0;
+};
+
+const hasFormControlName = (
+  node: ElementNode,
+  labelTargetIds: ReadonlySet<string>,
+  isInsideLabel: boolean,
+): boolean => {
+  if (hasAccessibleName(node)) return true;
+  if (isInsideLabel) return true;
+  const id = normalizeStaticId(getAttributeValue(node, "id"));
+  return Boolean(id && labelTargetIds.has(id));
+};
+
+const isNativeInteractive = (node: ElementNode): boolean => {
+  if (INTERACTIVE_TAGS.has(node.tag)) return true;
+  if (node.tag === "a") return Boolean(getAttribute(node, "href") ?? getDirective(node, "bind", "href"));
+  return false;
+};
+
+const hasKeyboardHandler = (node: ElementNode): boolean =>
+  Boolean(
+    getDirective(node, "on", "keydown") ??
+      getDirective(node, "on", "keyup") ??
+      getDirective(node, "on", "keypress"),
+  );
+
+const hasInteractiveRoleOrTabIndex = (node: ElementNode): boolean =>
+  Boolean(
+    getAttribute(node, "role") ??
+      getDirective(node, "bind", "role") ??
+      getAttribute(node, "tabindex") ??
+      getDirective(node, "bind", "tabindex"),
+  );
+
+const isComponentNode = (node: ElementNode): boolean =>
+  node.tagType === ElementTypes.COMPONENT || /^[A-Z]/.test(node.tag) || node.tag.includes("-");
+
+const isInlineObjectOrArrayExpression = (expression: string): boolean => {
+  const normalized = expression.trim();
+  return normalized.startsWith("{") || normalized.startsWith("[");
+};
+
+const isInlineFunctionExpression = (expression: string): boolean => {
+  const normalized = expression.trim();
+  return normalized.startsWith("async ") ||
+    normalized.startsWith("function") ||
+    /^\([^)]*\)\s*=>/.test(normalized) ||
+    /^[A-Za-z_$][\w$]*\s*=>/.test(normalized);
 };
 
 const visitExpression = (
@@ -143,9 +221,65 @@ const visitExpression = (
       }),
     );
   }
+
+  if (containsHydrationUnstableWork(expression)) {
+    report(
+      makeDiagnostic("no-hydration-unstable-template", lineOffset, localLine, {
+        severity: "warning",
+        category: "Correctness",
+        message: "Template expression can produce different server and client output.",
+        help: "Move random, time-based, or environment-specific values into mounted client state or server-provided data.",
+        column: 1,
+      }),
+    );
+  }
 };
 
-const inspectElement = (node: ElementNode, lineOffset: number, report: ScanContext["report"]): void => {
+const inspectInlineComponentProps = (
+  node: ElementNode,
+  lineOffset: number,
+  report: ScanContext["report"],
+): void => {
+  if (!isComponentNode(node)) return;
+
+  for (const prop of node.props) {
+    if (!isDirective(prop) || prop.name !== "bind" || !prop.exp) continue;
+    const argument = prop.arg?.loc.source ?? "";
+    if (INLINE_PROP_SKIP_ARGS.has(argument)) continue;
+
+    if (isInlineObjectOrArrayExpression(prop.exp.loc.source)) {
+      report(
+        makeDiagnostic("no-inline-template-object", lineOffset, prop.loc.start.line, {
+          severity: "warning",
+          category: "Performance",
+          message: "Component prop receives a new object or array on every render.",
+          help: "Move the object or array into a computed value, ref, or stable module constant.",
+          column: prop.loc.start.column,
+        }),
+      );
+    }
+
+    if (isInlineFunctionExpression(prop.exp.loc.source)) {
+      report(
+        makeDiagnostic("no-inline-template-function", lineOffset, prop.loc.start.line, {
+          severity: "warning",
+          category: "Performance",
+          message: "Component prop receives a new function on every render.",
+          help: "Move the function into setup/composables so child components can receive a stable reference.",
+          column: prop.loc.start.column,
+        }),
+      );
+    }
+  }
+};
+
+const inspectElement = (
+  node: ElementNode,
+  lineOffset: number,
+  labelTargetIds: ReadonlySet<string>,
+  isInsideLabel: boolean,
+  report: ScanContext["report"],
+): void => {
   const localLine = node.loc.start.line;
 
   if (hasDirective(node, "html")) {
@@ -207,8 +341,9 @@ const inspectElement = (node: ElementNode, lineOffset: number, report: ScanConte
   if (node.tag === "a") {
     const target = getAttributeValue(node, "target") ?? getBoundExpression(node, "target");
     const normalizedTarget = target ? normalizeExpression(target) : null;
-    const rel = getAttributeValue(node, "rel") ?? "";
-    if (normalizedTarget === "_blank" && !/\bnoopener\b/.test(rel)) {
+    const rel = getAttributeValue(node, "rel") ?? getBoundExpression(node, "rel") ?? "";
+    const normalizedRel = normalizeExpression(rel);
+    if (normalizedTarget === "_blank" && !/\bnoopener\b/.test(normalizedRel)) {
       report(
         makeDiagnostic("no-target-blank-without-rel", lineOffset, localLine, {
           severity: "error",
@@ -257,6 +392,60 @@ const inspectElement = (node: ElementNode, lineOffset: number, report: ScanConte
     );
   }
 
+  if (FORM_CONTROL_TAGS.has(node.tag)) {
+    const inputType = normalizeExpression(getAttributeValue(node, "type") ?? "");
+    if (inputType !== "hidden" && !hasFormControlName(node, labelTargetIds, isInsideLabel)) {
+      report(
+        makeDiagnostic("require-form-control-label", lineOffset, localLine, {
+          severity: "warning",
+          category: "Accessibility",
+          message: "Form control has no accessible label.",
+          help: "Wrap it in a label, add a label[for] target, or provide aria-label/aria-labelledby.",
+          column: node.loc.start.column,
+        }),
+      );
+    }
+  }
+
+  if (
+    hasDirective(node, "on", "click") &&
+    !isComponentNode(node) &&
+    !isNativeInteractive(node) &&
+    !hasKeyboardHandler(node) &&
+    !hasInteractiveRoleOrTabIndex(node)
+  ) {
+    report(
+      makeDiagnostic("no-click-without-keyboard", lineOffset, localLine, {
+        severity: "warning",
+        category: "Accessibility",
+        message: "Clickable non-interactive element has no keyboard path.",
+        help: "Use a button/link, or add role, tabindex, and Enter/Space keyboard handlers.",
+        column: node.loc.start.column,
+      }),
+    );
+  }
+
+  inspectInlineComponentProps(node, lineOffset, report);
+
+  if (node.tag === "meta") {
+    const name = normalizeExpression(getAttributeValue(node, "name") ?? "");
+    const content = getAttributeValue(node, "content") ?? "";
+    if (
+      name === "viewport" &&
+      /\b(?:user-scalable\s*=\s*no|maximum-scale\s*=\s*1(?:\.0+)?)\b/i.test(content)
+    ) {
+      report(
+        makeDiagnostic("no-disabled-zoom", lineOffset, localLine, {
+          severity: "warning",
+          category: "Accessibility",
+          message: "Viewport settings disable or cap user zoom.",
+          help: "Let users pinch zoom; avoid user-scalable=no and maximum-scale=1.",
+          column: node.loc.start.column,
+        }),
+      );
+    }
+  }
+
   for (const prop of node.props) {
     if (isDirective(prop) && shouldCheckDirectiveExpressionPurity(prop)) {
       visitExpression(prop.exp?.loc.source, lineOffset, prop.loc.start.line, report);
@@ -266,9 +455,37 @@ const inspectElement = (node: ElementNode, lineOffset: number, report: ScanConte
 
 type TraversableTemplateNode = RootNode | TemplateChildNode | { type: number; children?: unknown };
 
-const visitNode = (node: TraversableTemplateNode, lineOffset: number, report: ScanContext["report"]): void => {
+const collectLabelTargetIds = (node: TraversableTemplateNode, targets = new Set<string>()): Set<string> => {
   if (node.type === NodeTypes.ELEMENT) {
-    inspectElement(node as ElementNode, lineOffset, report);
+    const element = node as ElementNode;
+    if (element.tag === "label") {
+      const target = normalizeStaticId(getAttributeValue(element, "for"));
+      if (target) targets.add(target);
+    }
+  }
+
+  const children = "children" in node && Array.isArray(node.children) ? node.children : [];
+  for (const child of children) {
+    if (typeof child === "object" && child !== null && "type" in child) {
+      collectLabelTargetIds(child as TraversableTemplateNode, targets);
+    }
+  }
+
+  return targets;
+};
+
+const visitNode = (
+  node: TraversableTemplateNode,
+  lineOffset: number,
+  labelTargetIds: ReadonlySet<string>,
+  isInsideLabel: boolean,
+  report: ScanContext["report"],
+): void => {
+  const childIsInsideLabel =
+    isInsideLabel || (node.type === NodeTypes.ELEMENT && (node as ElementNode).tag === "label");
+
+  if (node.type === NodeTypes.ELEMENT) {
+    inspectElement(node as ElementNode, lineOffset, labelTargetIds, isInsideLabel, report);
   }
 
   if (node.type === NodeTypes.INTERPOLATION) {
@@ -279,7 +496,7 @@ const visitNode = (node: TraversableTemplateNode, lineOffset: number, report: Sc
   const children = "children" in node && Array.isArray(node.children) ? node.children : [];
   for (const child of children) {
     if (typeof child === "object" && child !== null && "type" in child) {
-      visitNode(child as TraversableTemplateNode, lineOffset, report);
+      visitNode(child as TraversableTemplateNode, lineOffset, labelTargetIds, childIsInsideLabel, report);
     }
   }
 };
@@ -318,5 +535,5 @@ export const scanTemplate = (
     return;
   }
 
-  visitNode(ast, lineOffset, context.report);
+  visitNode(ast, lineOffset, collectLabelTargetIds(ast), false, context.report);
 };

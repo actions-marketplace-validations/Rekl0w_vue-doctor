@@ -31,9 +31,11 @@ From your Vue project:
 
 ```powershell
 cd C:\Users\Windows\Desktop\your-vue-project
-vue-doctor . --verbose
-vue-doctor . --json > vue-doctor-report.json
-vue-doctor . --fail-on warning
+vue-doctor --verbose
+vue-doctor --json > vue-doctor-report.json
+vue-doctor --markdown > vue-doctor-report.md
+vue-doctor --sarif > vue-doctor.sarif
+vue-doctor --blocking warning
 ```
 
 When you are done testing:
@@ -58,8 +60,8 @@ From your Vue project:
 
 ```powershell
 cd C:\Users\Windows\Desktop\your-vue-project
-npm install -D C:\Users\Windows\Desktop\vue-doctor\.local-pack\rekl0w-vue-doctor-0.1.2.tgz
-npx vue-doctor . --verbose
+npm install -D (Get-ChildItem C:\Users\Windows\Desktop\vue-doctor\.local-pack\rekl0w-vue-doctor-*.tgz | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+npx vue-doctor --verbose
 ```
 
 Remove the local test package later:
@@ -71,14 +73,19 @@ npm uninstall @rekl0w/vue-doctor
 ## Useful Smoke Commands
 
 ```powershell
-vue-doctor . --score
-vue-doctor . --json
+vue-doctor --score
+vue-doctor --json
+vue-doctor --markdown
+vue-doctor --sarif
 vue-doctor src --include src
-vue-doctor . --fail-on none
-vue-doctor . --fail-on error
-vue-doctor . --annotations
+vue-doctor --blocking none
+vue-doctor --blocking error
+vue-doctor --annotations
+vue-doctor --scope changed --base main --blocking warning
+vue-doctor --update-baseline vue-doctor-baseline.json --blocking none
+vue-doctor --baseline vue-doctor-baseline.json --blocking warning
 ```
 
 ## Expected Output
 
-The CLI should print a `Vue Doctor` score line and diagnostics grouped by category. JSON mode should print one valid JSON object with `schemaVersion`, `project`, `diagnostics`, and `summary`.
+The CLI should print a `Vue Doctor` score line and diagnostics grouped by category. JSON mode should print one valid JSON object with `schemaVersion`, `project`, `diagnostics`, and `summary`. Markdown should render a summary table, and SARIF should emit a SARIF 2.1.0 object.

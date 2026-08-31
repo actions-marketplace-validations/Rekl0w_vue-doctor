@@ -7,12 +7,14 @@ Thanks for helping make Vue Doctor sharper.
 ```bash
 npm install
 npm run check
+npm run test:coverage
 ```
 
 Useful commands:
 
 ```bash
 npm run test
+npm run lint
 npm run typecheck
 npm run build
 npx vue-doctor tests/fixtures
@@ -49,7 +51,7 @@ Before opening a PR:
 This repo uses plain npm scripts for now:
 
 ```bash
-npm version patch
+npm version patch # or minor/major, based on the semver notes below
 npm publish --access public
 git push --follow-tags
 ```

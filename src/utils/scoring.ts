@@ -12,6 +12,8 @@ const CATEGORY_CAPS: Record<DiagnosticCategory, number> = {
   Accessibility: 6,
   Architecture: 12,
   Maintainability: 3,
+  "Bundle Size": 8,
+  Design: 5,
 };
 
 const SEVERITY_BASE_PENALTY: Record<Severity, number> = {

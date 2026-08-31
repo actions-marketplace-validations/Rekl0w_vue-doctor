@@ -2,6 +2,12 @@ import type { RuleDefinition } from "../types.js";
 
 export const rules: RuleDefinition[] = [
   {
+    name: "vue-project-not-found",
+    defaultSeverity: "error",
+    category: "Correctness",
+    description: "Vue Doctor should run from a Vue, Nuxt, or Vue SFC project.",
+  },
+  {
     name: "no-v-html",
     defaultSeverity: "error",
     category: "Security",
@@ -24,6 +30,66 @@ export const rules: RuleDefinition[] = [
     defaultSeverity: "error",
     category: "Security",
     description: "Flag likely secrets committed to client code.",
+  },
+  {
+    name: "no-public-runtime-secret",
+    defaultSeverity: "error",
+    category: "Security",
+    description: "Avoid exposing secret-like keys through Nuxt public runtime config.",
+  },
+  {
+    name: "no-public-env-secret",
+    defaultSeverity: "error",
+    category: "Security",
+    description: "Avoid exposing secret-like names through public client env variables.",
+  },
+  {
+    name: "no-risky-postinstall",
+    defaultSeverity: "error",
+    category: "Security",
+    description: "Avoid install lifecycle scripts that download and execute remote code.",
+  },
+  {
+    name: "low-supply-chain-score",
+    defaultSeverity: "error",
+    category: "Security",
+    description: "Flag dependencies whose Socket.dev security score is below the configured threshold.",
+  },
+  {
+    name: "no-mixed-lockfiles",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Keep one package-manager lockfile in the project root.",
+  },
+  {
+    name: "package-manager-lockfile-mismatch",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Keep packageManager aligned with the lockfile committed to the project.",
+  },
+  {
+    name: "no-unused-file",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Flag source files that are unreachable from detected app entry points.",
+  },
+  {
+    name: "no-unused-export",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Flag named exports that no local source file imports.",
+  },
+  {
+    name: "no-unused-dependency",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Flag runtime dependencies that scanned source and config files do not import.",
+  },
+  {
+    name: "no-circular-import",
+    defaultSeverity: "warning",
+    category: "Maintainability",
+    description: "Flag circular local import chains.",
   },
   {
     name: "require-v-for-key",
@@ -62,6 +128,18 @@ export const rules: RuleDefinition[] = [
     description: "Flag Vue 2 APIs in Vue 3 projects.",
   },
   {
+    name: "no-ssr-browser-global",
+    defaultSeverity: "warning",
+    category: "Correctness",
+    description: "Avoid reading browser-only globals at module/setup time in SSR-capable projects.",
+  },
+  {
+    name: "no-hydration-unstable-template",
+    defaultSeverity: "warning",
+    category: "Correctness",
+    description: "Avoid random or time-based template expressions that can cause hydration mismatches.",
+  },
+  {
     name: "no-expensive-template-expression",
     defaultSeverity: "warning",
     category: "Performance",
@@ -78,6 +156,42 @@ export const rules: RuleDefinition[] = [
     defaultSeverity: "warning",
     category: "Performance",
     description: "Async watchers should use cleanup or cancellation.",
+  },
+  {
+    name: "no-async-computed",
+    defaultSeverity: "error",
+    category: "Correctness",
+    description: "Computed getters should stay synchronous and cacheable.",
+  },
+  {
+    name: "no-sync-watch-flush",
+    defaultSeverity: "warning",
+    category: "Performance",
+    description: "Avoid sync-flush watchers that run inside Vue's render/update path.",
+  },
+  {
+    name: "no-inline-template-object",
+    defaultSeverity: "warning",
+    category: "Performance",
+    description: "Avoid recreating object or array props inside component templates.",
+  },
+  {
+    name: "no-inline-template-function",
+    defaultSeverity: "warning",
+    category: "Performance",
+    description: "Avoid recreating function props inside component templates.",
+  },
+  {
+    name: "no-transition-all",
+    defaultSeverity: "warning",
+    category: "Performance",
+    description: "Avoid transition: all because it can animate layout and paint-heavy properties.",
+  },
+  {
+    name: "no-permanent-will-change",
+    defaultSeverity: "warning",
+    category: "Performance",
+    description: "Avoid persistent will-change declarations that keep layers promoted.",
   },
   {
     name: "require-img-alt",
@@ -98,6 +212,24 @@ export const rules: RuleDefinition[] = [
     description: "Avoid autofocus stealing focus on navigation.",
   },
   {
+    name: "no-disabled-zoom",
+    defaultSeverity: "warning",
+    category: "Accessibility",
+    description: "Avoid viewport settings that disable pinch zoom.",
+  },
+  {
+    name: "require-form-control-label",
+    defaultSeverity: "warning",
+    category: "Accessibility",
+    description: "Require accessible names for inputs, selects, and textareas.",
+  },
+  {
+    name: "no-click-without-keyboard",
+    defaultSeverity: "warning",
+    category: "Accessibility",
+    description: "Clickable non-interactive elements need keyboard support.",
+  },
+  {
     name: "no-large-component",
     defaultSeverity: "warning",
     category: "Architecture",
@@ -114,6 +246,60 @@ export const rules: RuleDefinition[] = [
     defaultSeverity: "warning",
     category: "Maintainability",
     description: "Prefer scoped or module styles in SFCs.",
+  },
+  {
+    name: "no-full-lodash-import",
+    defaultSeverity: "warning",
+    category: "Bundle Size",
+    description: "Avoid importing all of lodash into client bundles.",
+  },
+  {
+    name: "no-moment",
+    defaultSeverity: "warning",
+    category: "Bundle Size",
+    description: "Avoid moment in browser bundles when lighter date utilities are enough.",
+  },
+  {
+    name: "prefer-dynamic-import",
+    defaultSeverity: "warning",
+    category: "Bundle Size",
+    description: "Lazy-load heavy browser-only libraries from the interaction or route that needs them.",
+  },
+  {
+    name: "no-outline-none",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid removing focus outlines without an accessible replacement.",
+  },
+  {
+    name: "no-tiny-text",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid text sizes that are hard to read on desktop and mobile.",
+  },
+  {
+    name: "no-wide-letter-spacing",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid excessive or negative letter spacing that hurts readability.",
+  },
+  {
+    name: "no-z-index-9999",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid magic z-index values that make layering hard to maintain.",
+  },
+  {
+    name: "no-pure-black-background",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid pure black backgrounds that create harsh contrast.",
+  },
+  {
+    name: "no-gradient-text",
+    defaultSeverity: "warning",
+    category: "Design",
+    description: "Avoid gradient text unless the brand system explicitly requires it.",
   },
 ];
 

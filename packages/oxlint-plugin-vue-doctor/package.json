@@ -1,0 +1,52 @@
+{
+  "name": "oxlint-plugin-vue-doctor",
+  "version": "0.6.0",
+  "description": "Vue Doctor rules for oxlint.",
+  "keywords": [
+    "accessibility",
+    "linter",
+    "oxc",
+    "oxlint",
+    "oxlint-plugin",
+    "performance",
+    "security",
+    "vue"
+  ],
+  "homepage": "https://github.com/Rekl0w/vue-doctor#readme",
+  "bugs": {
+    "url": "https://github.com/Rekl0w/vue-doctor/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rekl0w/vue-doctor.git",
+    "directory": "packages/oxlint-plugin-vue-doctor"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

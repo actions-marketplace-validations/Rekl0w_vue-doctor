@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Rekl0w/vue-doctor/main/schema/config.json",
+  "title": "Vue Doctor configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "rootDir": {
+      "type": "string"
+    },
+    "preset": {
+      "enum": [
+        "recommended",
+        "strict",
+        "design"
+      ]
+    },
+    "verbose": {
+      "type": "boolean"
+    },
+    "warnings": {
+      "type": "boolean"
+    },
+    "deadCode": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "timeoutMs": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    },
+    "supplyChain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "minScore": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning"
+          ]
+        },
+        "includeDevDependencies": {
+          "type": "boolean"
+        },
+        "cache": {
+          "type": "boolean"
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "totalTimeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "failOn": {
+      "enum": [
+        "error",
+        "warning",
+        "none"
+      ]
+    },
+    "blocking": {
+      "enum": [
+        "error",
+        "warning",
+        "none"
+      ]
+    },
+    "scope": {
+      "enum": [
+        "full",
+        "files",
+        "changed",
+        "lines"
+      ]
+    },
+    "base": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diff": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "baseline": {
+      "type": "string"
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maxComponentLines": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "maxProps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "respectInlineDisables": {
+      "type": "boolean"
+    },
+    "categories": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ruleLevel"
+      }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ruleLevel"
+      }
+    },
+    "ignore": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "files"
+            ],
+            "properties": {
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "rules": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "ruleLevel": {
+      "enum": [
+        "error",
+        "warning",
+        "off"
+      ]
+    }
+  }
+}

@@ -36,18 +36,32 @@ const detectFramework = (dependencies: Record<string, string>, rootDirectory: st
   return "unknown";
 };
 
+const hasVueFrameworkDependency = (dependencies: Record<string, string>): boolean =>
+  Boolean(
+    dependencies.vue ||
+      dependencies.nuxt ||
+      dependencies.quasar ||
+      dependencies.vitepress ||
+      dependencies.vuepress ||
+      dependencies["vuepress-vite"] ||
+      dependencies["@vue/cli-service"],
+  );
+
 export const discoverProject = (rootDirectory: string): ProjectInfo => {
   const packageJson = readPackageJson(rootDirectory);
   const dependencies = collectDependencies(packageJson);
   const sourceFiles = discoverSourceFiles(rootDirectory, [], {
     ignoreConfigFiles: true,
   });
+  const framework = detectFramework(dependencies, rootDirectory);
+  const hasVueSourceFiles = sourceFiles.some((filePath) => path.extname(filePath) === ".vue");
 
   return {
     rootDirectory,
     projectName: packageJson?.name ?? path.basename(rootDirectory),
+    hasVue: hasVueFrameworkDependency(dependencies) || hasVueSourceFiles,
     vueVersion: dependencies.vue ?? null,
-    framework: detectFramework(dependencies, rootDirectory),
+    framework,
     hasTypeScript:
       Boolean(dependencies.typescript) ||
       fs.existsSync(path.join(rootDirectory, "tsconfig.json")),
